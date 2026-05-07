@@ -144,9 +144,10 @@ ceap = (desp.join(dep.select("id_deputado", "sigla_partido", "sigla_uf", "nome")
                    "id_deputado", "left")
             .withColumn("media_grupo", F.avg("valor_liquido").over(w_grupo))
             .withColumn("std_grupo", F.stddev("valor_liquido").over(w_grupo))
+            # try_divide retorna null em vez de explodir quando std == 0
             .withColumn("z_score",
-                        (F.col("valor_liquido") - F.col("media_grupo")) / F.col("std_grupo"))
-            .withColumn("outlier", F.abs("z_score") > 3))
+                        F.expr("try_divide(valor_liquido - media_grupo, std_grupo)"))
+            .withColumn("outlier", F.coalesce(F.abs("z_score") > 3, F.lit(False))))
 write_gold("gold_ceap_anomalias", ceap)
 
 ranking = (desp.groupBy("cnpj_fornecedor", "nome_fornecedor")
