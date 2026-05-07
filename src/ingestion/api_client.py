@@ -95,12 +95,16 @@ class CamaraAPIClient:
         url = f"{self.cfg.base_url}{path}"
         params: dict[str, Any] = {**endpoint.params, **(extra_params or {})}
 
+        # Endpoints "filhos" (fanout, paginated=false) rejeitam pagina e itens.
+        # So injeta esses parametros para endpoints paginados.
         page_num = 1
         while True:
             if max_pages and page_num > max_pages:
                 break
 
-            params["pagina"] = page_num
+            if endpoint.paginated:
+                params["pagina"] = page_num
+
             r = self._get(url, params=params)
             body = r.json()
             records = body.get("dados", []) if isinstance(body, dict) else body
