@@ -91,6 +91,31 @@ Schema: `workspace.ftkeng_v2`. Volume: `workspace.ftkeng_v2.lakehouse`.
     └── decisions/              # ADRs
 ```
 
+## Por que a ingestão fica fora do cluster
+
+Em arquiteturas reais, a coleta da API não roda dentro do cluster Databricks.
+Razões:
+
+- **Custo**: cluster ligado custa $$/h. Bater em API leva segundos.
+- **Segurança**: clusters serverless têm egress de internet restrito por
+  default — princípio de least-privilege em multi-tenant.
+- **Acoplamento**: se a API cair, cluster fica retentando e pagando compute
+  parado.
+- **Observabilidade**: ingestão num orquestrador (Airflow, Lambda, Cron)
+  tem dashboards e alertas próprios.
+
+A separação que uso aqui reflete essa prática:
+
+```
+[ Worker leve ]      [ Object Storage ]      [ Cluster pesado ]
+src/ingestion/  ──►  Volume UC samples  ──►  Notebooks 02-04
+(bate na API)        (entrega zone)           (Bronze->Gold)
+```
+
+Pra reproduzir essa demonstração ao vivo, use `scripts/live_demo.py`:
+limpa samples, bate na API ao vivo (você vê o terminal), sobe pro Volume
+e dispara o pipeline no Databricks.
+
 ## Sobre
 
 Desenvolvido com auxílio de IA (Claude). Decisões e revisões são minhas.
