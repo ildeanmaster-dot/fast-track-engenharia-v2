@@ -1,0 +1,122 @@
+# Catalogo dos endpoints da API da Camara que vamos consumir.
+#
+# Cada entrada define:
+#   path           - URL relativa (BASE_URL fica no client)
+#   params         - parametros default da request
+#   paginated      - se respeita header Link rel="next"
+#   pk             - chaves primarias (usadas pra dedup no silver)
+#   incremental    - estrategia: snapshot, append, watermark, scd2
+#   fanout_from    - se este endpoint precisa de id de outro (1:N)
+#   fanout_param   - nome do parametro path para o id (default: id)
+
+base_url: https://dadosabertos.camara.leg.br/api/v2
+user_agent: camara-pipeline/0.1
+timeout: 30
+max_retries: 4
+
+endpoints:
+  # ---- listas base ----
+  partidos:
+    path: /partidos
+    params: {itens: 100}
+    paginated: true
+    pk: [id]
+    incremental: snapshot
+
+  legislaturas:
+    path: /legislaturas
+    params: {itens: 100}
+    paginated: true
+    pk: [id]
+    incremental: snapshot
+
+  deputados:
+    path: /deputados
+    params: {itens: 100, ordem: ASC, ordenarPor: nome}
+    paginated: true
+    pk: [id]
+    incremental: snapshot
+
+  frentes:
+    path: /frentes
+    params: {idLegislatura: 57, itens: 100}
+    paginated: true
+    pk: [id]
+    incremental: snapshot
+
+  orgaos:
+    path: /orgaos
+    params: {itens: 100}
+    paginated: true
+    pk: [id]
+    incremental: snapshot
+
+  eventos:
+    path: /eventos
+    params: {itens: 100}
+    paginated: true
+    pk: [id]
+    incremental: snapshot
+
+  votacoes:
+    path: /votacoes
+    params: {itens: 100, ordem: DESC, ordenarPor: dataHoraRegistro}
+    paginated: true
+    pk: [id]
+    incremental: append
+
+  proposicoes:
+    path: /proposicoes
+    params: {itens: 100, ordem: DESC, ordenarPor: id}
+    paginated: true
+    pk: [id]
+    incremental: snapshot
+
+  # ---- fanouts ----
+  frente_membros:
+    path: /frentes/{id}/membros
+    params: {}
+    paginated: false
+    pk: [id_frente, id_deputado]
+    incremental: snapshot
+    fanout_from: frentes
+
+  evento_deputados:
+    path: /eventos/{id}/deputados
+    params: {}
+    paginated: false
+    pk: [id_evento, id_deputado]
+    incremental: append
+    fanout_from: eventos
+
+  votacao_votos:
+    path: /votacoes/{id}/votos
+    params: {}
+    paginated: false
+    pk: [id_votacao, id_deputado]
+    incremental: append
+    fanout_from: votacoes
+
+  deputado_despesas:
+    path: /deputados/{id}/despesas
+    params: {itens: 100, ano: 2024, ordem: DESC, ordenarPor: ano}
+    paginated: true
+    pk: [id_deputado, codDocumento]
+    incremental: watermark
+    fanout_from: deputados
+
+  proposicao_tramitacoes:
+    path: /proposicoes/{id}/tramitacoes
+    params: {}
+    paginated: false
+    pk: [id_proposicao, sequencia]
+    incremental: scd2
+    fanout_from: proposicoes
+
+# limites de fanout (max_parents)
+fanout_limits:
+  frente_membros: 30
+  evento_deputados: 15
+  votacao_votos: 30
+  deputado_despesas: 15
+  proposicao_tramitacoes: 30
